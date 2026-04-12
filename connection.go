@@ -29,7 +29,8 @@ type Connection interface {
 	// Query scan the result rows by calling the collector repeatedly.
 	Query(ctx context.Context, collector RowCollector, sql string, args ...any) (CommandTag, error)
 
-	// QueryRow expects the result is exactly one row.
+	// QueryRow expects the result is at most one row. Returns nil [RowScanner] if
+	// the result is empty.
 	QueryRow(ctx context.Context, sql string, args ...any) (RowScanner, error)
 
 	// internalSendBatch internal function to send a batch
@@ -57,12 +58,11 @@ type _connection[pgxConnection _pgxConnection] struct {
 }
 
 const (
-	errorBegin         = exception.String("Postgres: Begin transaction failed")
-	errorExec          = exception.String("Postgres: Exec failed")
-	errorQuery         = exception.String("Postgres: Query failed")
-	errorQueryRow      = exception.String("Postgres: QueryRow failed")
-	errorQueryRowEmpty = exception.String("Postgres: QueryRow failed, no rows returned")
-	errorQueryRowMany  = exception.String("Postgres: QueryRow failed, more thanh one row returned")
+	errorBegin        = exception.String("Postgres: Begin transaction failed")
+	errorExec         = exception.String("Postgres: Exec failed")
+	errorQuery        = exception.String("Postgres: Query failed")
+	errorQueryRow     = exception.String("Postgres: QueryRow failed")
+	errorQueryRowMany = exception.String("Postgres: QueryRow failed, more than one row returned")
 )
 
 func (c _connection[pgxConnection]) Begin(ctx context.Context) (Transaction, error) {
@@ -134,7 +134,7 @@ func (c _connection[pgxConnection]) QueryRow(ctx context.Context, sql string, ar
 		return nil, errorQueryRow.AddCause(err)
 	} else {
 		if !rows.Next() {
-			return nil, errorQueryRowEmpty
+			return nil, nil
 		}
 		return func(destination ...any) (errorResult error) {
 			var ex exception.Exception
