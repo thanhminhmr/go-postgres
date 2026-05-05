@@ -21,6 +21,7 @@ type Batch interface {
 	Query(collector RowCollector, handler CommandTagHandler, sql string, args ...any)
 	QueryRow(collector RowCollector, sql string, args ...any)
 	Send() error
+	__()
 }
 
 type _batch struct {
@@ -122,3 +123,5 @@ func (b *_batch) Send() error {
 	}
 	return nil
 }
+
+func (b *_batch) __() {}
