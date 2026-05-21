@@ -23,6 +23,8 @@ type Transaction interface {
 	// operation itself fails. This ensures reliable and consistent transaction
 	// handling.
 	Finalize(ctx context.Context, errorResult *error)
+
+	__()
 }
 
 type _transaction struct {
@@ -75,3 +77,5 @@ func (t _transaction) Finalize(ctx context.Context, errorResult *error) {
 		*errorResult = ex
 	}
 }
+
+func (t _transaction) __() {}

@@ -8,7 +8,6 @@ package postgres
 
 import (
 	"context"
-	"sync/atomic"
 
 	"github.com/thanhminhmr/go-exception"
 
@@ -80,8 +79,7 @@ func (c _connection[pgxConnection]) Begin(ctx context.Context) (Transaction, err
 func (c _connection[pgxConnection]) Batch(ctx context.Context) Batch {
 	return &_batch{
 		ctx:        ctx,
-		batch:      pgx.Batch{},
-		connection: atomic.Value{},
+		connection: c,
 	}
 }
 

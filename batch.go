@@ -27,7 +27,8 @@ type Batch interface {
 type _batch struct {
 	ctx        context.Context
 	batch      pgx.Batch
-	connection atomic.Value
+	connection Connection
+	sent       atomic.Bool
 }
 
 const (
@@ -116,9 +117,10 @@ func (b *_batch) QueryRow(collector RowCollector, sql string, args ...any) {
 }
 
 func (b *_batch) Send() error {
-	if connection, _ := b.connection.Swap(nil).(Database); connection == nil {
+	if b.sent.Swap(true) {
 		panic("BUG: batch already sent")
-	} else if err := connection.internalSendBatch(b.ctx, &b.batch).Close(); err != nil {
+	}
+	if err := b.connection.internalSendBatch(b.ctx, &b.batch).Close(); err != nil {
 		return errorBatchSend.AddCause(err)
 	}
 	return nil
