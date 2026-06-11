@@ -16,15 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type Batch interface {
-	Exec(handler CommandTagHandler, sql string, args ...any)
-	Query(collector RowCollector, handler CommandTagHandler, sql string, args ...any)
-	QueryRow(collector RowCollector, sql string, args ...any)
-	Send() error
-	__()
-}
-
-type _batch struct {
+type Batch struct {
 	ctx        context.Context
 	batch      pgx.Batch
 	connection Connection
@@ -40,7 +32,7 @@ const (
 	errorBatchSend          = exception.String("Postgres: Send batch failed")
 )
 
-func (b *_batch) Exec(handler CommandTagHandler, sql string, args ...any) {
+func (b *Batch) Exec(handler CommandTagHandler, sql string, args ...any) {
 	query := b.batch.Queue(sql, args...)
 	if handler != nil {
 		query.Exec(func(tag pgconn.CommandTag) error {
@@ -52,7 +44,7 @@ func (b *_batch) Exec(handler CommandTagHandler, sql string, args ...any) {
 	}
 }
 
-func (b *_batch) Query(collector RowCollector, handler CommandTagHandler, sql string, args ...any) {
+func (b *Batch) Query(collector RowCollector, handler CommandTagHandler, sql string, args ...any) {
 	if collector == nil {
 		panic("BUG: collector is nil")
 	}
@@ -83,7 +75,7 @@ func (b *_batch) Query(collector RowCollector, handler CommandTagHandler, sql st
 	})
 }
 
-func (b *_batch) QueryRow(collector RowCollector, sql string, args ...any) {
+func (b *Batch) QueryRow(collector RowCollector, sql string, args ...any) {
 	if collector == nil {
 		panic("BUG: collector is nil")
 	}
@@ -116,7 +108,7 @@ func (b *_batch) QueryRow(collector RowCollector, sql string, args ...any) {
 	})
 }
 
-func (b *_batch) Send() error {
+func (b *Batch) Send() error {
 	if b.sent.Swap(true) {
 		panic("BUG: batch already sent")
 	}
@@ -125,5 +117,3 @@ func (b *_batch) Send() error {
 	}
 	return nil
 }
-
-func (b *_batch) __() {}

@@ -8,19 +8,14 @@ package postgres
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type CommandTag interface {
-	String() string
-	RowsAffected() int64
-	Insert() bool
-	Update() bool
-	Delete() bool
-	Select() bool
-}
+type CommandTag = pgconn.CommandTag
 
-type CommandTagHandler func(ctx context.Context, tag CommandTag) error
+type CommandTagHandler = func(ctx context.Context, tag CommandTag) error
 
-type RowScanner func(destination ...any) error
+type RowScanner = func(destination ...any) error
 
-type RowCollector func(ctx context.Context, row RowScanner) error
+type RowCollector = func(ctx context.Context, row RowScanner) error

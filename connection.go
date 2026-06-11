@@ -77,7 +77,7 @@ func (c _connection[pgxConnection]) Begin(ctx context.Context) (Transaction, err
 }
 
 func (c _connection[pgxConnection]) Batch(ctx context.Context) Batch {
-	return &_batch{
+	return Batch{
 		ctx:        ctx,
 		connection: c,
 	}
@@ -85,9 +85,9 @@ func (c _connection[pgxConnection]) Batch(ctx context.Context) Batch {
 
 func (c _connection[pgxConnection]) Exec(ctx context.Context, sql string, args ...any) (CommandTag, error) {
 	if tag, err := c.pgx.Exec(ctx, sql, args...); err != nil {
-		return nil, errorExec.AddCause(err)
+		return CommandTag{}, errorExec.AddCause(err)
 	} else {
-		return &tag, nil
+		return tag, nil
 	}
 }
 
@@ -101,7 +101,7 @@ func (c _connection[pgxConnection]) Query(
 		panic("BUG: collector is nil")
 	}
 	if rows, err := c.pgx.Query(ctx, sql, args...); err != nil {
-		return nil, errorQuery.AddCause(err)
+		return tag, errorQuery.AddCause(err)
 	} else {
 		var ex exception.Exception
 		defer func() {

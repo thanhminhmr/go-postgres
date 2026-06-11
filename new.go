@@ -14,9 +14,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/tracelog"
 	"github.com/rs/zerolog"
+	"github.com/thanhminhmr/go-common/ctrl"
 	"github.com/thanhminhmr/go-exception"
-	"go.uber.org/fx"
 )
+
+// Config defines the options that are used when connecting to a PostgreSQL instance
+type Config struct {
+	Address          string `env:"POSTGRES_ADDRESS" validate:"required,hostname_port"`
+	Username         string `env:"POSTGRES_USER" validate:"required"`
+	Password         string `env:"POSTGRES_PASSWORD" validate:"required"`
+	DatabaseName     string `env:"POSTGRES_DB_NAME" validate:"required"`
+	LogLevel         string `env:"POSTGRES_LOG_LEVEL" validate:"oneof=trace debug info warn error none" default:"info"`
+	MigrationTimeout uint   `env:"POSTGRES_MIGRATION_TIMEOUT" default:"30"`
+}
 
 const (
 	errorConfig  = exception.String("Postgres: Failed parsing config")
@@ -24,53 +34,33 @@ const (
 	errorMigrate = exception.String("Postgres: Failed to migrate database")
 )
 
-// New connects to the PostgreSQL database that are specified in
-// the configuration, migrates the database if required.
-func New(
-	lifecycle fx.Lifecycle,
-	config *Config,
-	plan MigrationPlan,
-) (Database, error) {
-	// parse configuration
-	parsedConfig, err := parseConfig(config)
-	if err != nil {
-		return nil, errorConfig.AddCause(err)
-	}
-	// try connect
-	pool, err := pgxpool.NewWithConfig(context.Background(), parsedConfig)
-	if err != nil {
-		return nil, errorConnect.AddCause(err)
-	}
-	// create database
-	database := &_database{_connection: _connection[*pgxpool.Pool]{pgx: pool}}
-	// migrate database
-	if len(plan) > 0 {
-		// set timeout if any
-		var err error
-		if config.MigrationTimeout > 0 {
-			err = func() error {
-				timeout := time.Duration(config.MigrationTimeout) * time.Second
-				ctx, cancel := context.WithTimeout(context.Background(), timeout)
-				defer cancel()
-				return plan.migrate(ctx, database)
-			}()
-		} else {
-			err = plan.migrate(context.Background(), database)
-		}
+func New(config *Config, plan MigrationPlan) Database {
+	var databaseResult Database
+	ctrl.RegisterWithTimeout(func(ctx context.Context) (ctrl.Runner, ctrl.Cleaner) {
+		// parse configuration
+		parsedConfig, err := parseConfig(config)
 		if err != nil {
-			database.close()
-			return nil, errorMigrate.AddCause(err)
+			panic(errorConfig.AddCause(err))
 		}
-	}
-	// add on start and on stop hook
-	lifecycle.Append(fx.Hook{
-		OnStop: func(ctx context.Context) error {
-			database.close()
-			return nil
-		},
-	})
-	// return connection
-	return database, nil
+		// try connect
+		pool, err := pgxpool.NewWithConfig(ctx, parsedConfig)
+		if err != nil {
+			panic(errorConnect.AddCause(err))
+		}
+		// create database
+		database := _database{_connection: _connection[*pgxpool.Pool]{pgx: pool}}
+		// migrate database
+		if len(plan) > 0 {
+			if err := plan.migrate(ctx, database); err != nil {
+				database.close()
+				panic(errorMigrate.AddCause(err))
+			}
+		}
+		// return the database
+		databaseResult = database
+		return nil, func(ctx context.Context) { database.close() }
+	}, time.Duration(config.MigrationTimeout)*time.Second)
+	return databaseResult
 }
 
 func parseConfig(config *Config) (*pgxpool.Config, error) {
@@ -111,23 +101,22 @@ func parseConfig(config *Config) (*pgxpool.Config, error) {
 			msg string,
 			data map[string]any,
 		) {
-			logger := zerolog.Ctx(ctx)
-			var event *zerolog.Event
+			var ctrlLevel zerolog.Level
 			switch level {
 			case tracelog.LogLevelError:
-				event = logger.Error()
+				ctrlLevel = zerolog.ErrorLevel
 			case tracelog.LogLevelWarn:
-				event = logger.Warn()
+				ctrlLevel = zerolog.WarnLevel
 			case tracelog.LogLevelInfo:
-				event = logger.Info()
+				ctrlLevel = zerolog.InfoLevel
 			case tracelog.LogLevelDebug:
-				event = logger.Debug()
+				ctrlLevel = zerolog.DebugLevel
 			case tracelog.LogLevelTrace:
-				event = logger.Trace()
+				ctrlLevel = zerolog.TraceLevel
 			default:
 				return
 			}
-			event.Any("data", data).Msg(msg)
+			ctrl.Logger(ctx).Level(ctrlLevel).Any("data", data).Msg(msg)
 		}),
 		LogLevel: logLevel,
 	}
