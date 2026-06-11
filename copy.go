@@ -19,12 +19,8 @@ const (
 )
 
 func CopyAll[T any](
-	connection Connection,
-	ctx context.Context,
-	tableName string,
-	columnNames []string,
-	input []T,
-	outputMapper SliceMapper[T],
+	connection Connection, ctx context.Context, tableName string,
+	columnNames []string, input []T, outputMapper SliceMapper[T],
 ) (errorResult error) {
 	// create transaction
 	transaction, err := connection.Begin(ctx)
@@ -49,12 +45,8 @@ func CopyAll[T any](
 }
 
 func CopyAny[T any](
-	connection Connection,
-	ctx context.Context,
-	tableName string,
-	columnNames []string,
-	input []T,
-	outputMapper SliceMapper[T],
+	connection Connection, ctx context.Context, tableName string,
+	columnNames []string, input []T, outputMapper SliceMapper[T],
 ) (int64, error) {
 	source := &fromSlice[T]{
 		mapper: outputMapper,

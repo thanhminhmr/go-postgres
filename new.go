@@ -96,10 +96,7 @@ func parseConfig(config *Config) (*pgxpool.Config, error) {
 	// set log tracer
 	parsedConfig.ConnConfig.Tracer = &tracelog.TraceLog{
 		Logger: tracelog.LoggerFunc(func(
-			ctx context.Context,
-			level tracelog.LogLevel,
-			msg string,
-			data map[string]any,
+			ctx context.Context, level tracelog.LogLevel, msg string, data map[string]any,
 		) {
 			var ctrlLevel zerolog.Level
 			switch level {
@@ -116,7 +113,9 @@ func parseConfig(config *Config) (*pgxpool.Config, error) {
 			default:
 				return
 			}
-			ctrl.Logger(ctx).Level(ctrlLevel).Any("data", data).Msg(msg)
+			ctrl.Logger(ctx).Level(ctrlLevel).
+				Dict("data", (*zerolog.Event)(nil).CreateDict().Fields(data)).
+				Msg(msg)
 		}),
 		LogLevel: logLevel,
 	}

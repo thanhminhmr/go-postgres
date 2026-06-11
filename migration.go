@@ -23,7 +23,7 @@ type MigrationRecord struct {
 // language=PostgreSQL
 const migrationCreateTable = `
 CREATE TABLE IF NOT EXISTS _migrations_ (
-	id CHARACTER VARYING(31) COLLATE "C.utf8" NOT NULL,
+	id CHARACTER VARYING(31) COLLATE "ucs_basic" NOT NULL,
 	applied_at TIMESTAMP WITH TIME ZONE NOT NULL,
 	CONSTRAINT _migrations_pk PRIMARY KEY (id)
 )`
@@ -45,7 +45,7 @@ func (migrationPlan MigrationPlan) migrate(ctx context.Context, database Databas
 	appliedIds := map[string]struct{}{}
 	collector := func(ctx context.Context, scanner RowScanner) error {
 		var appliedId string
-		if err := scanner(ctx, &appliedId); err != nil {
+		if err := scanner(&appliedId); err != nil {
 			return err
 		}
 		appliedIds[appliedId] = struct{}{}
