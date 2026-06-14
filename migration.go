@@ -16,16 +16,20 @@ import (
 type MigrationPlan []MigrationRecord
 
 type MigrationRecord struct {
-	Id  string
-	Sql []string
+	Id      string
+	Queries []MigrationQuery
+}
+
+type MigrationQuery struct {
+	Sql  string
+	Args []any
 }
 
 // language=PostgreSQL
 const migrationCreateTable = `
 CREATE TABLE IF NOT EXISTS _migrations_ (
-	id CHARACTER VARYING(31) COLLATE "ucs_basic" NOT NULL,
-	applied_at TIMESTAMP WITH TIME ZONE NOT NULL,
-	CONSTRAINT _migrations_pk PRIMARY KEY (id)
+	id VARCHAR(31) COLLATE "ucs_basic" PRIMARY KEY NOT NULL,
+	applied_at TIMESTAMP WITH TIME ZONE NOT NULL
 )`
 
 // language=PostgreSQL
@@ -75,9 +79,10 @@ func (migrationRecord MigrationRecord) migrate(ctx context.Context, database Dat
 		return err
 	}
 	defer transaction.Finalize(ctx, &errorResult)
+	// run
 	// run each query
-	for _, sql := range migrationRecord.Sql {
-		if _, err := transaction.Exec(ctx, sql); err != nil {
+	for _, query := range migrationRecord.Queries {
+		if _, err := transaction.Exec(ctx, query.Sql, query.Args...); err != nil {
 			return err
 		}
 	}

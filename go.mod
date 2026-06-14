@@ -6,7 +6,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/rs/zerolog v1.35.1
 	github.com/thanhminhmr/go-common v0.0.48
-	github.com/thanhminhmr/go-exception v0.0.15
+	github.com/thanhminhmr/go-exception v0.0.16
 )
 
 require (

@@ -113,7 +113,7 @@ func parseConfig(config *Config) (*pgxpool.Config, error) {
 			default:
 				return
 			}
-			ctrl.Logger(ctx).Level(ctrlLevel).
+			ctrl.Logger(ctx).Level(ctrlLevel).CallerSkipFrame(4).
 				Dict("data", (*zerolog.Event)(nil).CreateDict().Fields(data)).
 				Msg(msg)
 		}),
