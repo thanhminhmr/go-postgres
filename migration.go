@@ -25,9 +25,9 @@ type MigrationQuery struct {
 	Args []any
 }
 
+const migrationCreateTable =
 // language=PostgreSQL
-const migrationCreateTable = `
-CREATE TABLE IF NOT EXISTS _migrations_ (
+`CREATE TABLE IF NOT EXISTS _migrations_ (
 	id VARCHAR(31) COLLATE "ucs_basic" PRIMARY KEY NOT NULL,
 	applied_at TIMESTAMP WITH TIME ZONE NOT NULL
 )`

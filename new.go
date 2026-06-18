@@ -43,7 +43,7 @@ func New(config *Config, plan MigrationPlan) Database {
 			panic(errorConfig.AddCause(err))
 		}
 		// try connect
-		pool, err := pgxpool.NewWithConfig(ctx, parsedConfig)
+		pool, err := pgxpool.NewWithConfig(ctrl.GlobalCtx(), parsedConfig)
 		if err != nil {
 			panic(errorConnect.AddCause(err))
 		}
