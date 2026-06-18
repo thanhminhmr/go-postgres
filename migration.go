@@ -13,14 +13,8 @@ import (
 	"github.com/thanhminhmr/go-exception"
 )
 
-type MigrationPlan []MigrationRecord
-
-type MigrationRecord struct {
-	Id      string
-	Queries []MigrationQuery
-}
-
-type MigrationQuery struct {
+type MigrationPlan = map[string]MigrationRecord
+type MigrationRecord = []struct {
 	Sql  string
 	Args []any
 }
@@ -40,7 +34,7 @@ const migrationCreateRecord = `INSERT INTO _migrations_ (id, applied_at) VALUES 
 
 const errorMigrationRecord = exception.String("Postgres: Failed to create migration record")
 
-func (migrationPlan MigrationPlan) migrate(ctx context.Context, database Database) error {
+func migrateAll(ctx context.Context, database Database, plan MigrationPlan) error {
 	// create migration table
 	if _, err := database.Exec(ctx, migrationCreateTable); err != nil {
 		return err
@@ -59,35 +53,34 @@ func (migrationPlan MigrationPlan) migrate(ctx context.Context, database Databas
 		return err
 	}
 	// run migration plans
-	for _, record := range migrationPlan {
+	for id, record := range plan {
 		// check if migration is already existed
-		if _, exists := appliedIds[record.Id]; exists {
+		if _, exists := appliedIds[id]; exists {
 			continue
 		}
 		// apply migration
-		if err := record.migrate(ctx, database); err != nil {
+		if err := migrateOne(ctx, database, id, record); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (migrationRecord MigrationRecord) migrate(ctx context.Context, database Database) (errorResult error) {
+func migrateOne(ctx context.Context, database Database, id string, record MigrationRecord) (errorResult error) {
 	// create new transaction
 	transaction, err := database.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer transaction.Finalize(ctx, &errorResult)
-	// run
 	// run each query
-	for _, query := range migrationRecord.Queries {
+	for _, query := range record {
 		if _, err := transaction.Exec(ctx, query.Sql, query.Args...); err != nil {
 			return err
 		}
 	}
 	// create migration record
-	tag, err := transaction.Exec(ctx, migrationCreateRecord, migrationRecord.Id, time.Now())
+	tag, err := transaction.Exec(ctx, migrationCreateRecord, id, time.Now())
 	if err != nil {
 		return err
 	}

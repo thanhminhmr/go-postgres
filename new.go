@@ -51,7 +51,7 @@ func New(config *Config, plan MigrationPlan) Database {
 		database := _database{_connection: _connection[*pgxpool.Pool]{pgx: pool}}
 		// migrate database
 		if len(plan) > 0 {
-			if err := plan.migrate(ctx, database); err != nil {
+			if err := migrateAll(ctx, database, plan); err != nil {
 				database.close()
 				panic(errorMigrate.AddCause(err))
 			}
