@@ -34,8 +34,11 @@ const (
 	errorMigrate = exception.String("Postgres: Failed to migrate database")
 )
 
-func New(config *Config, plan MigrationPlan) Database {
-	var databaseResult Database
+type Starter = func(ctx context.Context) (Runner, Cleaner)
+type Runner = func(ctx context.Context, shutdown context.CancelFunc)
+type Cleaner = func(ctx context.Context)
+
+func New(config *Config, plan MigrationPlan) (database *pgxpool.Pool) {
 	ctrl.RegisterWithTimeout(func(ctx context.Context) (ctrl.Runner, ctrl.Cleaner) {
 		// parse configuration
 		parsedConfig, err := parseConfig(config)
@@ -43,24 +46,21 @@ func New(config *Config, plan MigrationPlan) Database {
 			panic(errorConfig.AddCause(err))
 		}
 		// try connect
-		pool, err := pgxpool.NewWithConfig(ctrl.GlobalCtx(), parsedConfig)
+		database, err = pgxpool.NewWithConfig(ctrl.GlobalCtx(), parsedConfig)
 		if err != nil {
 			panic(errorConnect.AddCause(err))
 		}
-		// create database
-		database := _database{_connection: _connection[*pgxpool.Pool]{pgx: pool}}
 		// migrate database
 		if len(plan) > 0 {
 			if err := migrateAll(ctx, database, plan); err != nil {
-				database.close()
+				database.Close()
 				panic(errorMigrate.AddCause(err))
 			}
 		}
 		// return the database
-		databaseResult = database
-		return nil, func(ctx context.Context) { database.close() }
+		return nil, func(ctx context.Context) { database.Close() }
 	}, time.Duration(config.MigrationTimeout)*time.Second)
-	return databaseResult
+	return
 }
 
 func parseConfig(config *Config) (*pgxpool.Config, error) {
@@ -98,7 +98,7 @@ func parseConfig(config *Config) (*pgxpool.Config, error) {
 		Logger: tracelog.LoggerFunc(func(
 			ctx context.Context, level tracelog.LogLevel, msg string, data map[string]any,
 		) {
-			var ctrlLevel zerolog.Level
+			var ctrlLevel ctrl.LogLevel
 			switch level {
 			case tracelog.LogLevelError:
 				ctrlLevel = zerolog.ErrorLevel

@@ -10,11 +10,19 @@ import (
 	"context"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/thanhminhmr/go-exception"
 )
 
-type MigrationPlan = map[string]MigrationRecord
-type MigrationRecord = []struct {
+type MigrationPlan []MigrationRecord
+
+type MigrationRecord struct {
+	Id      string
+	Queries []MigrationQuery
+}
+
+type MigrationQuery struct {
 	Sql  string
 	Args []any
 }
@@ -34,59 +42,48 @@ const migrationCreateRecord = `INSERT INTO _migrations_ (id, applied_at) VALUES 
 
 const errorMigrationRecord = exception.String("Postgres: Failed to create migration record")
 
-func migrateAll(ctx context.Context, database Database, plan MigrationPlan) error {
+func migrateAll(ctx context.Context, database *pgxpool.Pool, plan MigrationPlan) error {
 	// create migration table
 	if _, err := database.Exec(ctx, migrationCreateTable); err != nil {
 		return err
 	}
-	// get previous migration records
-	appliedIds := map[string]struct{}{}
-	collector := func(ctx context.Context, scanner RowScanner) error {
-		var appliedId string
-		if err := scanner(&appliedId); err != nil {
-			return err
-		}
-		appliedIds[appliedId] = struct{}{}
-		return nil
+	// query previous migration record ids
+	rows, err := database.Query(ctx, migrationSelectIds)
+	if err != nil {
+		return err
 	}
-	if _, err := database.Query(ctx, collector, migrationSelectIds); err != nil {
+	// scan previous migration record ids into a map
+	appliedIds := map[string]struct{}{}
+	var appliedId string
+	if _, err := pgx.ForEachRow(
+		rows, []any{&appliedId}, func() error { appliedIds[appliedId] = struct{}{}; return nil },
+	); err != nil {
 		return err
 	}
 	// run migration plans
-	for id, record := range plan {
+	for _, record := range plan {
 		// check if migration is already existed
-		if _, exists := appliedIds[id]; exists {
+		if _, exists := appliedIds[record.Id]; exists {
 			continue
 		}
 		// apply migration
-		if err := migrateOne(ctx, database, id, record); err != nil {
+		if err := Transaction(database, ctx, func(ctx context.Context, tx pgx.Tx) error {
+			// run each query
+			for _, query := range record.Queries {
+				if _, err := tx.Exec(ctx, query.Sql, query.Args...); err != nil {
+					return err
+				}
+			}
+			// create migration record
+			if tag, err := tx.Exec(ctx, migrationCreateRecord, record.Id, time.Now()); err != nil {
+				return err
+			} else if tag.RowsAffected() != 1 {
+				return errorMigrationRecord
+			}
+			return nil
+		}); err != nil {
 			return err
 		}
 	}
-	return nil
-}
-
-func migrateOne(ctx context.Context, database Database, id string, record MigrationRecord) (errorResult error) {
-	// create new transaction
-	transaction, err := database.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer transaction.Finalize(ctx, &errorResult)
-	// run each query
-	for _, query := range record {
-		if _, err := transaction.Exec(ctx, query.Sql, query.Args...); err != nil {
-			return err
-		}
-	}
-	// create migration record
-	tag, err := transaction.Exec(ctx, migrationCreateRecord, id, time.Now())
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() != 1 {
-		return errorMigrationRecord
-	}
-	// success
 	return nil
 }
