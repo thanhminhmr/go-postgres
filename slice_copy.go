@@ -24,7 +24,7 @@ func CopyAllFromSlice[T any, Conn Querier](
 	conn Conn, ctx context.Context, tableName string,
 	columnNames []string, input []T, outputMapper FromSliceValue[T],
 ) (errorResult error) {
-	return Transaction(conn, ctx, func(ctx context.Context, tx pgx.Tx) error {
+	return Transaction(conn, ctx, func(tx pgx.Tx) error {
 		// create source
 		source := fromSlice[T]{
 			mapper: outputMapper,
@@ -90,7 +90,7 @@ func CopyAllFromMap[K comparable, V any, Conn Querier](
 	conn Conn, ctx context.Context, tableName string,
 	columnNames []string, input map[K]V, outputMapper FromMapKeyValue[K, V],
 ) error {
-	return Transaction(conn, ctx, func(ctx context.Context, tx pgx.Tx) error {
+	return Transaction(conn, ctx, func(tx pgx.Tx) error {
 		next, stop := iter.Pull2(maps.All(input))
 		defer stop()
 		// create source

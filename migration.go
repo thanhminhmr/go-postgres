@@ -67,7 +67,7 @@ func migrateAll(ctx context.Context, database *pgxpool.Pool, plan MigrationPlan)
 			continue
 		}
 		// apply migration
-		if err := Transaction(database, ctx, func(ctx context.Context, tx pgx.Tx) error {
+		if err := Transaction(database, ctx, func(tx pgx.Tx) error {
 			// run each query
 			for _, query := range record.Queries {
 				if _, err := tx.Exec(ctx, query.Sql, query.Args...); err != nil {

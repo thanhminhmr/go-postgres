@@ -14,7 +14,7 @@ import (
 )
 
 func Transaction[Conn Querier](
-	conn Conn, ctx context.Context, transaction func(ctx context.Context, tx pgx.Tx) error,
+	conn Conn, ctx context.Context, transaction func(tx pgx.Tx) error,
 ) (result error) {
 	tx, result := conn.Begin(ctx)
 	if result != nil {
@@ -28,7 +28,7 @@ func Transaction[Conn Querier](
 			}
 		}
 	}()
-	if err := transaction(ctx, tx); err != nil {
+	if err := transaction(tx); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
