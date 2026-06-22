@@ -20,13 +20,11 @@ const (
 	errorCopyAny = exception.String("Postgres: CopyAny failed")
 )
 
-func CopyAllFromSlice[T any, Connection interface {
-	Begin(context.Context) (pgx.Tx, error)
-}](
-	connection Connection, ctx context.Context, tableName string,
+func CopyAllFromSlice[T any, Conn Querier](
+	conn Conn, ctx context.Context, tableName string,
 	columnNames []string, input []T, outputMapper FromSliceValue[T],
 ) (errorResult error) {
-	return Transaction(connection, ctx, func(ctx context.Context, tx pgx.Tx) error {
+	return Transaction(conn, ctx, func(ctx context.Context, tx pgx.Tx) error {
 		// create source
 		source := fromSlice[T]{
 			mapper: outputMapper,
@@ -44,10 +42,8 @@ func CopyAllFromSlice[T any, Connection interface {
 	})
 }
 
-func CopyAnyFromSlice[T any, Connection interface {
-	CopyFrom(context.Context, pgx.Identifier, []string, pgx.CopyFromSource) (int64, error)
-}](
-	connection Connection, ctx context.Context, tableName string,
+func CopyAnyFromSlice[T any, Conn Querier](
+	conn Conn, ctx context.Context, tableName string,
 	columnNames []string, input []T, outputMapper FromSliceValue[T],
 ) (int64, error) {
 	// create source
@@ -58,7 +54,7 @@ func CopyAnyFromSlice[T any, Connection interface {
 		index:  -1,
 	}
 	// call copy and check the result
-	count, err := connection.CopyFrom(ctx, pgx.Identifier{tableName}, columnNames, &source)
+	count, err := conn.CopyFrom(ctx, pgx.Identifier{tableName}, columnNames, &source)
 	if err != nil {
 		return count, errorCopyAny.AddCause(err)
 	}
@@ -90,13 +86,11 @@ func (f *fromSlice[T]) Err() error {
 	return f.err
 }
 
-func CopyAllFromMap[K comparable, V any, Connection interface {
-	Begin(context.Context) (pgx.Tx, error)
-}](
-	connection Connection, ctx context.Context, tableName string,
+func CopyAllFromMap[K comparable, V any, Conn Querier](
+	conn Conn, ctx context.Context, tableName string,
 	columnNames []string, input map[K]V, outputMapper FromMapKeyValue[K, V],
 ) error {
-	return Transaction(connection, ctx, func(ctx context.Context, tx pgx.Tx) error {
+	return Transaction(conn, ctx, func(ctx context.Context, tx pgx.Tx) error {
 		next, stop := iter.Pull2(maps.All(input))
 		defer stop()
 		// create source
@@ -116,10 +110,8 @@ func CopyAllFromMap[K comparable, V any, Connection interface {
 	})
 }
 
-func CopyAnyFromMap[K comparable, V any, Connection interface {
-	CopyFrom(context.Context, pgx.Identifier, []string, pgx.CopyFromSource) (int64, error)
-}](
-	connection Connection, ctx context.Context, tableName string,
+func CopyAnyFromMap[K comparable, V any, Conn Querier](
+	conn Conn, ctx context.Context, tableName string,
 	columnNames []string, input map[K]V, outputMapper FromMapKeyValue[K, V],
 ) (int64, error) {
 	next, stop := iter.Pull2(maps.All(input))
@@ -131,7 +123,7 @@ func CopyAnyFromMap[K comparable, V any, Connection interface {
 		next:   next,
 	}
 	// call copy and check the result
-	count, err := connection.CopyFrom(ctx, pgx.Identifier{tableName}, columnNames, &source)
+	count, err := conn.CopyFrom(ctx, pgx.Identifier{tableName}, columnNames, &source)
 	if err != nil {
 		return count, errorCopyAny.AddCause(err)
 	}

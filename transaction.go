@@ -13,22 +13,19 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func Transaction[Connection interface {
-	Begin(context.Context) (pgx.Tx, error)
-}](
-	conn Connection, ctx context.Context, transaction func(ctx context.Context, tx pgx.Tx) error,
+func Transaction[Conn Querier](
+	conn Conn, ctx context.Context, transaction func(ctx context.Context, tx pgx.Tx) error,
 ) (result error) {
-	tx, err := conn.Begin(ctx)
-	if err != nil {
-		return err
+	tx, result := conn.Begin(ctx)
+	if result != nil {
+		return result
 	}
 	result = noCommit{}
 	defer func() {
-		if result == nil {
-			return
-		}
-		if err := tx.Rollback(ctx); err != nil {
-			result = errors.Join(result, err)
+		if result != nil {
+			if err := tx.Rollback(ctx); err != nil {
+				result = errors.Join(result, err)
+			}
 		}
 	}()
 	if err := transaction(ctx, tx); err != nil {
