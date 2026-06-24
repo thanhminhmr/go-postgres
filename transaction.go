@@ -13,25 +13,26 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func Transaction[Conn Querier](
-	conn Conn, ctx context.Context, transaction func(tx pgx.Tx) error,
-) (result error) {
-	tx, result := conn.Begin(ctx)
-	if result != nil {
-		return result
+func Transaction[Conn Querier, Result any](
+	conn Conn, ctx context.Context, transaction func(tx pgx.Tx) (Result, error),
+) (result Result, resultErr error) {
+	tx, resultErr := conn.Begin(ctx)
+	if resultErr != nil {
+		return result, resultErr
 	}
-	result = noCommit{}
+	resultErr = noCommit{}
 	defer func() {
-		if result != nil {
+		if resultErr != nil {
 			if err := tx.Rollback(ctx); err != nil {
-				result = errors.Join(result, err)
+				resultErr = errors.Join(resultErr, err)
 			}
 		}
 	}()
-	if err := transaction(tx); err != nil {
-		return err
+	result, err := transaction(tx)
+	if err != nil {
+		return result, err
 	}
-	return tx.Commit(ctx)
+	return result, tx.Commit(ctx)
 }
 
 type noCommit struct{}
