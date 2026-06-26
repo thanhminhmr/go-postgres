@@ -23,8 +23,8 @@ const (
 func CopyAllFromSlice[T any, Conn Querier](
 	conn Conn, ctx context.Context, tableName string,
 	columnNames []string, input []T, outputMapper FromSliceValue[T],
-) (errorResult error) {
-	return Transaction(conn, ctx, func(tx pgx.Tx) error {
+) error {
+	_, err := Transaction(conn, ctx, func(tx pgx.Tx) (struct{}, error) {
 		// create source
 		source := fromSlice[T]{
 			mapper: outputMapper,
@@ -34,12 +34,13 @@ func CopyAllFromSlice[T any, Conn Querier](
 		}
 		// call copy and check the result
 		if count, err := tx.CopyFrom(ctx, pgx.Identifier{tableName}, columnNames, &source); err != nil {
-			return errorCopyAll.AddCause(err)
+			return struct{}{}, errorCopyAll.AddCause(err)
 		} else if count != int64(len(input)) {
-			return errorCopyAll
+			return struct{}{}, errorCopyAll
 		}
-		return nil
+		return struct{}{}, nil
 	})
+	return err
 }
 
 func CopyAnyFromSlice[T any, Conn Querier](
@@ -90,7 +91,7 @@ func CopyAllFromMap[K comparable, V any, Conn Querier](
 	conn Conn, ctx context.Context, tableName string,
 	columnNames []string, input map[K]V, outputMapper FromMapKeyValue[K, V],
 ) error {
-	return Transaction(conn, ctx, func(tx pgx.Tx) error {
+	_, err := Transaction(conn, ctx, func(tx pgx.Tx) (struct{}, error) {
 		next, stop := iter.Pull2(maps.All(input))
 		defer stop()
 		// create source
@@ -102,12 +103,13 @@ func CopyAllFromMap[K comparable, V any, Conn Querier](
 		// call copy and check the result
 		count, err := tx.CopyFrom(ctx, pgx.Identifier{tableName}, columnNames, &source)
 		if err != nil {
-			return errorCopyAll.AddCause(err)
+			return struct{}{}, errorCopyAll.AddCause(err)
 		} else if count != int64(len(input)) {
-			return errorCopyAll
+			return struct{}{}, errorCopyAll
 		}
-		return nil
+		return struct{}{}, nil
 	})
+	return err
 }
 
 func CopyAnyFromMap[K comparable, V any, Conn Querier](

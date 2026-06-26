@@ -15,14 +15,14 @@ import (
 	"github.com/thanhminhmr/go-exception"
 )
 
-type MigrationPlan []MigrationRecord
+type MigrationPlan = []MigrationRecord
 
-type MigrationRecord struct {
+type MigrationRecord = struct {
 	Id      string
 	Queries []MigrationQuery
 }
 
-type MigrationQuery struct {
+type MigrationQuery = struct {
 	Sql  string
 	Args []any
 }
@@ -67,20 +67,20 @@ func migrateAll(ctx context.Context, database *pgxpool.Pool, plan MigrationPlan)
 			continue
 		}
 		// apply migration
-		if err := Transaction(database, ctx, func(tx pgx.Tx) error {
+		if _, err := Transaction(database, ctx, func(tx pgx.Tx) (struct{}, error) {
 			// run each query
 			for _, query := range record.Queries {
 				if _, err := tx.Exec(ctx, query.Sql, query.Args...); err != nil {
-					return err
+					return struct{}{}, err
 				}
 			}
 			// create migration record
 			if tag, err := tx.Exec(ctx, migrationCreateRecord, record.Id, time.Now()); err != nil {
-				return err
+				return struct{}{}, err
 			} else if tag.RowsAffected() != 1 {
-				return errorMigrationRecord
+				return struct{}{}, errorMigrationRecord
 			}
-			return nil
+			return struct{}{}, nil
 		}); err != nil {
 			return err
 		}

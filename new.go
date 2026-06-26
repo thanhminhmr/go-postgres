@@ -34,10 +34,6 @@ const (
 	errorMigrate = exception.String("Postgres: Failed to migrate database")
 )
 
-type Starter = func(ctx context.Context) (Runner, Cleaner)
-type Runner = func(ctx context.Context, shutdown context.CancelFunc)
-type Cleaner = func(ctx context.Context)
-
 func New(config *Config, plan MigrationPlan) (database *pgxpool.Pool) {
 	ctrl.RegisterWithTimeout(func(ctx context.Context) (ctrl.Runner, ctrl.Cleaner) {
 		// parse configuration

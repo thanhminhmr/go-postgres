@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-type Querier interface {
+type Querier = interface {
 	Begin(context.Context) (pgx.Tx, error)
 	CopyFrom(context.Context, pgx.Identifier, []string, pgx.CopyFromSource) (int64, error)
 	SendBatch(context.Context, *pgx.Batch) pgx.BatchResults
